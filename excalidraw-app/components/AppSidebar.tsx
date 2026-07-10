@@ -89,7 +89,9 @@ export const AppSidebar = () => {
           <div
             className="app-sidebar-promo-image"
             style={{
-              ["--image-source" as any]: `url(/sidebar-comments-promo-${
+              ["--image-source" as any]: `url(${
+                import.meta.env.BASE_URL
+              }sidebar-comments-promo-${
                 theme === THEME.DARK ? "dark" : "light"
               }.jpg)`,
               opacity: 0.9,
@@ -108,7 +110,9 @@ export const AppSidebar = () => {
           <div
             className="app-sidebar-promo-image"
             style={{
-              ["--image-source" as any]: `url(/sidebar-presentation-promo-${
+              ["--image-source" as any]: `url(${
+                import.meta.env.BASE_URL
+              }sidebar-presentation-promo-${
                 theme === THEME.DARK ? "dark" : "light"
               }.jpg)`,
               opacity: 0.7,

@@ -18,7 +18,7 @@ export const ExcalidrawLogo = ({
     <div className={`ExcalidrawLogo is-${size}`} style={style}>
       <img
         className="ExcalidrawLogo-icon"
-        src="/android-chrome-192x192.png"
+        src={`${import.meta.env.BASE_URL}android-chrome-192x192.png`}
         alt="SketchFlow"
       />
       {withText && <span className="ExcalidrawLogo-text">SketchFlow</span>}
