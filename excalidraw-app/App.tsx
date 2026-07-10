@@ -98,6 +98,7 @@ import Collab, {
 import { AppFooter } from "./components/AppFooter";
 import { AppMainMenu } from "./components/AppMainMenu";
 import { AppWelcomeScreen } from "./components/AppWelcomeScreen";
+import { SketchFlowWorkspace } from "./components/SketchFlowWorkspace";
 import {
   ExportToExcalidrawPlus,
   exportToExcalidrawPlus,
@@ -1006,6 +1007,9 @@ const ExcalidrawWrapper = () => {
           )}
         </OverwriteConfirmDialog>
         <AppFooter onChange={() => excalidrawAPI?.refresh()} />
+        {excalidrawAPI && (
+          <SketchFlowWorkspace excalidrawAPI={excalidrawAPI} />
+        )}
         {excalidrawAPI && <AIComponents excalidrawAPI={excalidrawAPI} />}
 
         <TTDDialogTrigger />

@@ -1,0 +1,132 @@
+.SketchFlowWorkspace__trigger {
+  position: fixed;
+  right: 5.25rem;
+  top: 1.45rem;
+  z-index: 5;
+  height: 2.75rem;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 8px;
+  background: #e9e7f5;
+  color: #1d1458;
+  font: inherit;
+  cursor: pointer;
+}
+
+.SketchFlowWorkspace__status {
+  position: fixed;
+  right: 1rem;
+  bottom: 4.5rem;
+  z-index: 5;
+  max-width: 17rem;
+  color: #6c6c80;
+  font-size: 0.75rem;
+  pointer-events: none;
+}
+
+.SketchFlowWorkspace {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: flex-end;
+  background: rgb(15 15 20 / 42%);
+}
+
+.SketchFlowWorkspace__panel {
+  width: min(680px, 100vw);
+  height: 100%;
+  overflow: auto;
+  background: var(--island-bg-color, #fff);
+  color: var(--text-primary-color, #1f1f1f);
+  box-shadow: -10px 0 30px rgb(0 0 0 / 18%);
+  padding: 1rem;
+}
+
+.SketchFlowWorkspace__header,
+.SketchFlowWorkspace__toolbar,
+.SketchFlowWorkspace__scene,
+.SketchFlowWorkspace__actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.SketchFlowWorkspace__header {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--default-border-color, #ddd);
+  padding-bottom: 1rem;
+}
+
+.SketchFlowWorkspace__header h2,
+.SketchFlowWorkspace__scene h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.SketchFlowWorkspace__header p,
+.SketchFlowWorkspace__scene p {
+  margin: 0.25rem 0 0;
+  color: #777;
+  font-size: 0.82rem;
+}
+
+.SketchFlowWorkspace__toolbar {
+  flex-wrap: wrap;
+  padding: 1rem 0;
+}
+
+.SketchFlowWorkspace button,
+.SketchFlowWorkspace select {
+  min-height: 2.25rem;
+  border: 1px solid var(--default-border-color, #d8d8df);
+  border-radius: 8px;
+  background: var(--button-gray-1, #f2f2f7);
+  color: inherit;
+  font: inherit;
+  padding: 0 0.75rem;
+}
+
+.SketchFlowWorkspace__list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.SketchFlowWorkspace__scene {
+  justify-content: space-between;
+  border: 1px solid var(--default-border-color, #ddd);
+  border-radius: 8px;
+  padding: 0.85rem;
+}
+
+.SketchFlowWorkspace__scene[data-active="true"] {
+  border-color: #6965db;
+}
+
+.SketchFlowWorkspace__actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.SketchFlowWorkspace__empty {
+  border: 1px dashed var(--default-border-color, #ddd);
+  border-radius: 8px;
+  color: #777;
+  padding: 2rem;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .SketchFlowWorkspace__trigger {
+    right: 4.25rem;
+    top: 1.1rem;
+    height: 2.5rem;
+    padding: 0 0.75rem;
+  }
+
+  .SketchFlowWorkspace__scene,
+  .SketchFlowWorkspace__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
