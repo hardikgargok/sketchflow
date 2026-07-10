@@ -1,8 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  base64ToString,
+  decode,
+  encode,
+  stringToBase64,
+} from "@excalidraw/excalidraw/data/encode";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import "./SketchFlowWorkspace.scss";
+
+type SketchFlowComment = {
+  id: string;
+  text: string;
+  createdAt: number;
+};
 
 type SketchFlowScene = {
   id: string;
@@ -13,6 +25,7 @@ type SketchFlowScene = {
   elements: unknown[];
   appState: Record<string, unknown>;
   files: Record<string, unknown>;
+  comments?: SketchFlowComment[];
 };
 
 type SceneDraft = Omit<SketchFlowScene, "id" | "createdAt" | "updatedAt">;
@@ -22,6 +35,8 @@ const DB_VERSION = 1;
 const SCENE_STORE = "scenes";
 const ACTIVE_SCENE_KEY = "sketchflow-workspace-active-scene";
 const DEFAULT_COLLECTION = "Personal";
+const SHARE_PARAM = "sf_scene";
+const READONLY_PARAM = "sf_readonly";
 
 const openDatabase = () =>
   new Promise<IDBDatabase>((resolve, reject) => {
@@ -78,6 +93,43 @@ const deleteScene = (id: string) =>
 const createId = () =>
   `scene-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
+const toUrlSafeBase64 = (base64: string) =>
+  base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+
+const fromUrlSafeBase64 = (base64url: string) =>
+  base64url
+    .replace(/-/g, "+")
+    .replace(/_/g, "/")
+    .padEnd(base64url.length + ((4 - (base64url.length % 4)) % 4), "=");
+
+const encodeSceneForUrl = (scene: SceneDraft) => {
+  const encoded = encode({
+    text: JSON.stringify({ version: 1, scene }),
+  });
+  return toUrlSafeBase64(stringToBase64(JSON.stringify(encoded)));
+};
+
+const decodeSceneFromUrl = (payload: string): SceneDraft => {
+  const encoded = JSON.parse(base64ToString(fromUrlSafeBase64(payload)));
+  return JSON.parse(decode(encoded)).scene;
+};
+
+const copyText = async (text: string) => {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
+};
+
 const getSceneDraft = (api: ExcalidrawImperativeAPI): SceneDraft => ({
   name: api.getName() || "Untitled scene",
   collection: DEFAULT_COLLECTION,
@@ -103,8 +155,10 @@ export const SketchFlowWorkspace = ({
     localStorage.getItem(ACTIVE_SCENE_KEY),
   );
   const [collectionFilter, setCollectionFilter] = useState("All");
+  const [searchText, setSearchText] = useState("");
   const [status, setStatus] = useState("Workspace ready");
   const autosaveTimerRef = useRef<number | null>(null);
+  const loadedSharedSceneRef = useRef(false);
 
   const refreshScenes = useCallback(async () => {
     setScenes(await listScenes());
@@ -116,6 +170,44 @@ export const SketchFlowWorkspace = ({
       setStatus("Workspace could not load");
     });
   }, [refreshScenes]);
+
+  useEffect(() => {
+    if (loadedSharedSceneRef.current) {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const sharedScene = params.get(SHARE_PARAM);
+    if (!sharedScene) {
+      return;
+    }
+
+    loadedSharedSceneRef.current = true;
+    try {
+      const scene = decodeSceneFromUrl(sharedScene);
+      excalidrawAPI.resetScene();
+      excalidrawAPI.addFiles(Object.values(scene.files) as any);
+      excalidrawAPI.updateScene({
+        elements: scene.elements as any,
+        appState: {
+          ...scene.appState,
+          name: scene.name,
+          viewModeEnabled: params.get(READONLY_PARAM) === "1",
+          openDialog: null,
+          isLoading: false,
+        } as any,
+      });
+      excalidrawAPI.history.clear();
+      setStatus(
+        params.get(READONLY_PARAM) === "1"
+          ? "Opened readonly shared scene"
+          : "Opened shared scene",
+      );
+    } catch (error) {
+      console.error(error);
+      setStatus("Shared scene link could not open");
+    }
+  }, [excalidrawAPI]);
 
   const saveScene = useCallback(
     async (options?: { duplicate?: boolean; collection?: string }) => {
@@ -132,6 +224,7 @@ export const SketchFlowWorkspace = ({
         id: existing?.id || createId(),
         createdAt: existing?.createdAt || now,
         updatedAt: now,
+        comments: existing?.comments || [],
       };
 
       await putScene(scene);
@@ -139,6 +232,7 @@ export const SketchFlowWorkspace = ({
       setActiveSceneId(scene.id);
       setStatus(`Saved ${scene.name}`);
       await refreshScenes();
+      return scene;
     },
     [activeSceneId, excalidrawAPI, refreshScenes],
   );
@@ -225,14 +319,79 @@ export const SketchFlowWorkspace = ({
     setStatus("Collection updated");
   };
 
+  const addComment = async (scene: SketchFlowScene) => {
+    const text = window.prompt("Comment")?.trim();
+    if (!text) {
+      return;
+    }
+    await putScene({
+      ...scene,
+      comments: [
+        ...(scene.comments || []),
+        { id: createId(), text, createdAt: Date.now() },
+      ],
+      updatedAt: Date.now(),
+    });
+    await refreshScenes();
+    setStatus("Comment added");
+  };
+
+  const copyReadonlyLink = async () => {
+    const draft = getSceneDraft(excalidrawAPI);
+    const payload = encodeSceneForUrl(draft);
+    const url = `${window.location.origin}${window.location.pathname}?${READONLY_PARAM}=1&${SHARE_PARAM}=${payload}`;
+    await copyText(url);
+    setStatus(
+      url.length > 7500
+        ? "Readonly link copied, but this scene may be too large for some browsers"
+        : "Readonly link copied",
+    );
+  };
+
+  const copyEmbedCode = async () => {
+    const draft = getSceneDraft(excalidrawAPI);
+    const payload = encodeSceneForUrl(draft);
+    const url = `${window.location.origin}${window.location.pathname}?${READONLY_PARAM}=1&${SHARE_PARAM}=${payload}`;
+    await copyText(
+      `<iframe src="${url}" width="100%" height="600" style="border:0;" title="SketchFlow scene"></iframe>`,
+    );
+    setStatus("Embed code copied");
+  };
+
+  const startPresentationMode = () => {
+    excalidrawAPI.updateScene({
+      appState: {
+        viewModeEnabled: true,
+        zenModeEnabled: true,
+        frameRendering: {
+          enabled: true,
+          outline: true,
+          name: true,
+          clip: true,
+        },
+      } as any,
+    });
+    setStatus("Presentation view enabled");
+  };
+
   const collections = useMemo(
     () => ["All", ...Array.from(new Set(scenes.map((scene) => scene.collection)))],
     [scenes],
   );
-  const visibleScenes =
-    collectionFilter === "All"
-      ? scenes
-      : scenes.filter((scene) => scene.collection === collectionFilter);
+  const visibleScenes = scenes.filter((scene) => {
+    const matchesCollection =
+      collectionFilter === "All" || scene.collection === collectionFilter;
+    const needle = searchText.trim().toLowerCase();
+    const matchesSearch =
+      !needle ||
+      scene.name.toLowerCase().includes(needle) ||
+      scene.collection.toLowerCase().includes(needle) ||
+      (scene.comments || []).some((comment) =>
+        comment.text.toLowerCase().includes(needle),
+      );
+
+    return matchesCollection && matchesSearch;
+  });
 
   return (
     <>
@@ -263,6 +422,23 @@ export const SketchFlowWorkspace = ({
               <button type="button" onClick={() => saveScene({ duplicate: true })}>
                 Duplicate to workspace
               </button>
+              <button type="button" onClick={copyReadonlyLink}>
+                Copy readonly link
+              </button>
+              <button type="button" onClick={copyEmbedCode}>
+                Copy embed code
+              </button>
+              <button type="button" onClick={startPresentationMode}>
+                Presentation view
+              </button>
+            </div>
+            <div className="SketchFlowWorkspace__filters">
+              <input
+                type="search"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder="Search scenes, collections, comments"
+              />
               <select
                 value={collectionFilter}
                 onChange={(event) => setCollectionFilter(event.target.value)}
@@ -303,6 +479,9 @@ export const SketchFlowWorkspace = ({
                     <button type="button" onClick={() => moveScene(scene)}>
                       Collection
                     </button>
+                    <button type="button" onClick={() => addComment(scene)}>
+                      Comment
+                    </button>
                     <button
                       type="button"
                       onClick={() => removeScene(scene.id)}
@@ -310,6 +489,13 @@ export const SketchFlowWorkspace = ({
                       Delete
                     </button>
                   </div>
+                  {(scene.comments || []).length > 0 && (
+                    <div className="SketchFlowWorkspace__comments">
+                      {(scene.comments || []).slice(-2).map((comment) => (
+                        <p key={comment.id}>{comment.text}</p>
+                      ))}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
