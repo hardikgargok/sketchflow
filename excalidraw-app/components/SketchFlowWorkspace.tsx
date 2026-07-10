@@ -37,6 +37,7 @@ const ACTIVE_SCENE_KEY = "sketchflow-workspace-active-scene";
 const DEFAULT_COLLECTION = "Personal";
 const SHARE_PARAM = "sf_scene";
 const READONLY_PARAM = "sf_readonly";
+const PRESENTATION_PARAM = "sf_present";
 
 const openDatabase = () =>
   new Promise<IDBDatabase>((resolve, reject) => {
@@ -192,14 +193,28 @@ export const SketchFlowWorkspace = ({
         appState: {
           ...scene.appState,
           name: scene.name,
-          viewModeEnabled: params.get(READONLY_PARAM) === "1",
+          viewModeEnabled:
+            params.get(READONLY_PARAM) === "1" ||
+            params.get(PRESENTATION_PARAM) === "1",
+          zenModeEnabled: params.get(PRESENTATION_PARAM) === "1",
+          frameRendering:
+            params.get(PRESENTATION_PARAM) === "1"
+              ? {
+                  enabled: true,
+                  outline: true,
+                  name: true,
+                  clip: true,
+                }
+              : scene.appState.frameRendering,
           openDialog: null,
           isLoading: false,
         } as any,
       });
       excalidrawAPI.history.clear();
       setStatus(
-        params.get(READONLY_PARAM) === "1"
+        params.get(PRESENTATION_PARAM) === "1"
+          ? "Opened presentation link"
+          : params.get(READONLY_PARAM) === "1"
           ? "Opened readonly shared scene"
           : "Opened shared scene",
       );
@@ -348,6 +363,30 @@ export const SketchFlowWorkspace = ({
     );
   };
 
+  const copyEditableLink = async () => {
+    const draft = getSceneDraft(excalidrawAPI);
+    const payload = encodeSceneForUrl(draft);
+    const url = `${window.location.origin}${window.location.pathname}?${SHARE_PARAM}=${payload}`;
+    await copyText(url);
+    setStatus(
+      url.length > 7500
+        ? "Editable link copied, but this scene may be too large for some browsers"
+        : "Editable link copied",
+    );
+  };
+
+  const copyPresentationLink = async () => {
+    const draft = getSceneDraft(excalidrawAPI);
+    const payload = encodeSceneForUrl(draft);
+    const url = `${window.location.origin}${window.location.pathname}?${READONLY_PARAM}=1&${PRESENTATION_PARAM}=1&${SHARE_PARAM}=${payload}`;
+    await copyText(url);
+    setStatus(
+      url.length > 7500
+        ? "Presentation link copied, but this scene may be too large for some browsers"
+        : "Presentation link copied",
+    );
+  };
+
   const copyEmbedCode = async () => {
     const draft = getSceneDraft(excalidrawAPI);
     const payload = encodeSceneForUrl(draft);
@@ -372,6 +411,11 @@ export const SketchFlowWorkspace = ({
       } as any,
     });
     setStatus("Presentation view enabled");
+  };
+
+  const printToPdf = () => {
+    startPresentationMode();
+    window.setTimeout(() => window.print(), 250);
   };
 
   const collections = useMemo(
@@ -422,14 +466,23 @@ export const SketchFlowWorkspace = ({
               <button type="button" onClick={() => saveScene({ duplicate: true })}>
                 Duplicate to workspace
               </button>
+              <button type="button" onClick={copyEditableLink}>
+                Copy editable link
+              </button>
               <button type="button" onClick={copyReadonlyLink}>
                 Copy readonly link
+              </button>
+              <button type="button" onClick={copyPresentationLink}>
+                Copy presentation link
               </button>
               <button type="button" onClick={copyEmbedCode}>
                 Copy embed code
               </button>
               <button type="button" onClick={startPresentationMode}>
                 Presentation view
+              </button>
+              <button type="button" onClick={printToPdf}>
+                Print / PDF
               </button>
             </div>
             <div className="SketchFlowWorkspace__filters">
