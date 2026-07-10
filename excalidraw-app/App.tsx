@@ -39,13 +39,10 @@ import { t } from "@excalidraw/excalidraw/i18n";
 
 import {
   GithubIcon,
-  XBrandIcon,
-  DiscordIcon,
   ExcalLogo,
   usersIcon,
   exportToPlus,
   share,
-  youtubeIcon,
 } from "@excalidraw/excalidraw/components/icons";
 import { isElementLink } from "@excalidraw/element";
 import {
@@ -1137,60 +1134,7 @@ const ExcalidrawWrapper = () => {
               ],
               perform: () => {
                 window.open(
-                  "https://github.com/",
-                  "_blank",
-                  "noopener noreferrer",
-                );
-              },
-            },
-            {
-              label: "Follow SketchFlow",
-              icon: XBrandIcon,
-              category: DEFAULT_CATEGORIES.links,
-              predicate: true,
-              keywords: ["twitter", "contact", "social", "community"],
-              perform: () => {
-                window.open(
-                  "https://x.com/",
-                  "_blank",
-                  "noopener noreferrer",
-                );
-              },
-            },
-            {
-              label: "SketchFlow community",
-              category: DEFAULT_CATEGORIES.links,
-              predicate: true,
-              icon: DiscordIcon,
-              keywords: [
-                "chat",
-                "talk",
-                "contact",
-                "bugs",
-                "requests",
-                "report",
-                "feedback",
-                "suggestions",
-                "social",
-                "community",
-              ],
-              perform: () => {
-                window.open(
-                  "https://discord.com/",
-                  "_blank",
-                  "noopener noreferrer",
-                );
-              },
-            },
-            {
-              label: "YouTube",
-              icon: youtubeIcon,
-              category: DEFAULT_CATEGORIES.links,
-              predicate: true,
-              keywords: ["features", "tutorials", "howto", "help", "community"],
-              perform: () => {
-                window.open(
-                  "https://youtube.com/",
+                  "https://github.com/hardikgargok/sketchflow/issues",
                   "_blank",
                   "noopener noreferrer",
                 );

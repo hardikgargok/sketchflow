@@ -370,7 +370,7 @@ export const Socials = () => {
     <>
       <DropdownMenuItemLink
         icon={GithubIcon}
-        href="https://github.com/"
+        href="https://github.com/hardikgargok/sketchflow"
         aria-label="GitHub"
       >
         GitHub

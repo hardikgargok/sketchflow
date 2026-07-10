@@ -12,7 +12,7 @@ import { getShortcutKey } from "../shortcut";
 
 import { useExcalidrawActionManager } from "./App";
 import { Dialog } from "./Dialog";
-import { ExternalLinkIcon, GithubIcon, youtubeIcon } from "./icons";
+import { ExternalLinkIcon, GithubIcon } from "./icons";
 
 import "./HelpDialog.scss";
 
@@ -31,30 +31,12 @@ const Header = () => (
     </a>
     <a
       className="HelpDialog__btn"
-      href="https://plus.excalidraw.com/blog"
-      target="_blank"
-      rel="noopener"
-    >
-      <div className="HelpDialog__link-icon">{ExternalLinkIcon}</div>
-      {t("helpDialog.blog")}
-    </a>
-    <a
-      className="HelpDialog__btn"
-      href="https://github.com/excalidraw/excalidraw/issues"
+      href="https://github.com/hardikgargok/sketchflow/issues"
       target="_blank"
       rel="noopener noreferrer"
     >
       <div className="HelpDialog__link-icon">{GithubIcon}</div>
       {t("helpDialog.github")}
-    </a>
-    <a
-      className="HelpDialog__btn"
-      href="https://youtube.com/@excalidraw"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      <div className="HelpDialog__link-icon">{youtubeIcon}</div>
-      YouTube
     </a>
   </div>
 );
