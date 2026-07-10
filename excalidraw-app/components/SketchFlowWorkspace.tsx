@@ -7,6 +7,7 @@ import {
   stringToBase64,
 } from "@excalidraw/excalidraw/data/encode";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import { exportToBlob, MIME_TYPES } from "@excalidraw/utils/export";
 
 import "./SketchFlowWorkspace.scss";
 
@@ -158,8 +159,30 @@ export const SketchFlowWorkspace = ({
   const [collectionFilter, setCollectionFilter] = useState("All");
   const [searchText, setSearchText] = useState("");
   const [status, setStatus] = useState("Workspace ready");
+  const [toastMessage, setToastMessage] = useState("");
   const autosaveTimerRef = useRef<number | null>(null);
   const loadedSharedSceneRef = useRef(false);
+  const toastTimerRef = useRef<number | null>(null);
+  const isReadonlyLink = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(READONLY_PARAM) === "1";
+  }, []);
+
+  const notify = useCallback(
+    (message: string) => {
+      setStatus(message);
+      setToastMessage(message);
+      excalidrawAPI.setToast({ message });
+
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+      toastTimerRef.current = window.setTimeout(() => {
+        setToastMessage("");
+      }, 2200);
+    },
+    [excalidrawAPI],
+  );
 
   const refreshScenes = useCallback(async () => {
     setScenes(await listScenes());
@@ -171,6 +194,39 @@ export const SketchFlowWorkspace = ({
       setStatus("Workspace could not load");
     });
   }, [refreshScenes]);
+
+  useEffect(() => {
+    if (!isReadonlyLink) {
+      return;
+    }
+
+    const enforceReadonly = () => {
+      const appState = excalidrawAPI.getAppState();
+      excalidrawAPI.updateScene({
+        appState: {
+          viewModeEnabled: true,
+          activeTool: {
+            ...appState.activeTool,
+            type: "selection",
+            locked: false,
+          },
+        } as any,
+      });
+    };
+
+    enforceReadonly();
+    return excalidrawAPI.onStateChange(
+      (appState) => ({
+        activeToolType: appState.activeTool.type,
+        viewModeEnabled: appState.viewModeEnabled,
+      }),
+      (state) => {
+        if (!state.viewModeEnabled || state.activeToolType !== "selection") {
+          enforceReadonly();
+        }
+      },
+    );
+  }, [excalidrawAPI, isReadonlyLink]);
 
   useEffect(() => {
     if (loadedSharedSceneRef.current) {
@@ -253,6 +309,10 @@ export const SketchFlowWorkspace = ({
   );
 
   useEffect(() => {
+    if (isReadonlyLink) {
+      return;
+    }
+
     const unsubscribe = excalidrawAPI.onChange(() => {
       if (autosaveTimerRef.current) {
         window.clearTimeout(autosaveTimerRef.current);
@@ -272,6 +332,14 @@ export const SketchFlowWorkspace = ({
       }
     };
   }, [excalidrawAPI, saveScene]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   const openScene = async (id: string) => {
     const scene = await getScene(id);
@@ -356,7 +424,7 @@ export const SketchFlowWorkspace = ({
     const payload = encodeSceneForUrl(draft);
     const url = `${window.location.origin}${window.location.pathname}?${READONLY_PARAM}=1&${SHARE_PARAM}=${payload}`;
     await copyText(url);
-    setStatus(
+    notify(
       url.length > 7500
         ? "Readonly link copied, but this scene may be too large for some browsers"
         : "Readonly link copied",
@@ -368,7 +436,7 @@ export const SketchFlowWorkspace = ({
     const payload = encodeSceneForUrl(draft);
     const url = `${window.location.origin}${window.location.pathname}?${SHARE_PARAM}=${payload}`;
     await copyText(url);
-    setStatus(
+    notify(
       url.length > 7500
         ? "Editable link copied, but this scene may be too large for some browsers"
         : "Editable link copied",
@@ -380,7 +448,7 @@ export const SketchFlowWorkspace = ({
     const payload = encodeSceneForUrl(draft);
     const url = `${window.location.origin}${window.location.pathname}?${READONLY_PARAM}=1&${PRESENTATION_PARAM}=1&${SHARE_PARAM}=${payload}`;
     await copyText(url);
-    setStatus(
+    notify(
       url.length > 7500
         ? "Presentation link copied, but this scene may be too large for some browsers"
         : "Presentation link copied",
@@ -394,7 +462,7 @@ export const SketchFlowWorkspace = ({
     await copyText(
       `<iframe src="${url}" width="100%" height="600" style="border:0;" title="SketchFlow scene"></iframe>`,
     );
-    setStatus("Embed code copied");
+    notify("Embed code copied");
   };
 
   const startPresentationMode = () => {
@@ -413,9 +481,77 @@ export const SketchFlowWorkspace = ({
     setStatus("Presentation view enabled");
   };
 
-  const printToPdf = () => {
-    startPresentationMode();
-    window.setTimeout(() => window.print(), 250);
+  const printToPdf = async () => {
+    const draft = getSceneDraft(excalidrawAPI);
+    setIsOpen(false);
+    setStatus("Preparing PDF print view");
+
+    try {
+      const blob = await exportToBlob({
+        elements: draft.elements as any,
+        appState: {
+          ...draft.appState,
+          exportBackground: true,
+          viewModeEnabled: true,
+        } as any,
+        files: draft.files as any,
+        mimeType: MIME_TYPES.png,
+        exportPadding: 32,
+        maxWidthOrHeight: 2600,
+      });
+      const objectUrl = URL.createObjectURL(blob);
+      const printWindow = window.open("", "_blank");
+
+      if (!printWindow) {
+        URL.revokeObjectURL(objectUrl);
+        notify("Popup blocked. Allow popups to print PDF.");
+        return;
+      }
+
+      printWindow.document.write(`<!doctype html>
+<html>
+<head>
+  <title>${draft.name}</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: #fff;
+    }
+    body {
+      display: grid;
+      place-items: center;
+    }
+    img {
+      display: block;
+      max-width: 100%;
+      max-height: 100vh;
+      object-fit: contain;
+    }
+    @page {
+      margin: 12mm;
+    }
+  </style>
+</head>
+<body>
+  <img src="${objectUrl}" alt="${draft.name.replace(/"/g, "&quot;")}" />
+  <script>
+    const image = document.querySelector("img");
+    image.addEventListener("load", () => {
+      window.focus();
+      window.print();
+    });
+  </script>
+</body>
+</html>`);
+      printWindow.document.close();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+      notify("PDF print view opened");
+    } catch (error) {
+      console.error(error);
+      notify("PDF print view failed");
+    }
   };
 
   const collections = useMemo(
@@ -447,6 +583,11 @@ export const SketchFlowWorkspace = ({
         Workspace
       </button>
       <div className="SketchFlowWorkspace__status">{status}</div>
+      {toastMessage && (
+        <div className="SketchFlowWorkspace__toast" role="status">
+          {toastMessage}
+        </div>
+      )}
       {isOpen && (
         <div className="SketchFlowWorkspace" role="dialog" aria-modal="true">
           <div className="SketchFlowWorkspace__panel">

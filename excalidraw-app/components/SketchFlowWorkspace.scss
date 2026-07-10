@@ -24,6 +24,23 @@
   pointer-events: none;
 }
 
+.SketchFlowWorkspace__toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  z-index: 30;
+  transform: translateX(-50%);
+  border-radius: 8px;
+  background: #232329;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  color: #fff;
+  font-size: 0.9rem;
+  max-width: min(28rem, calc(100vw - 2rem));
+  padding: 0.75rem 1rem;
+  pointer-events: none;
+  text-align: center;
+}
+
 .SketchFlowWorkspace {
   position: fixed;
   inset: 0;
@@ -161,5 +178,14 @@
 
   .SketchFlowWorkspace__actions {
     justify-content: flex-start;
+  }
+}
+
+@media print {
+  .SketchFlowWorkspace__trigger,
+  .SketchFlowWorkspace__status,
+  .SketchFlowWorkspace__toast,
+  .SketchFlowWorkspace {
+    display: none !important;
   }
 }
