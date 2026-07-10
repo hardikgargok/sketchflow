@@ -570,6 +570,18 @@ export const DiscordIcon = createIcon(
   modifiedTablerIconProps,
 );
 
+export const LinkedInIcon = createIcon(
+  <g strokeWidth="1.45">
+    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+    <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
+    <path d="M8 10v6" />
+    <path d="M8 7.8v.01" />
+    <path d="M12 16v-3.25a2.25 2.25 0 0 1 4.5 0V16" />
+    <path d="M12 10v6" />
+  </g>,
+  tablerIconProps,
+);
+
 export const XBrandIcon = createIcon(
   <g strokeWidth="1.25">
     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
