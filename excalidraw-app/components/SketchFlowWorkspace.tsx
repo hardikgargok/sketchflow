@@ -7,6 +7,7 @@ import {
   stringToBase64,
 } from "@excalidraw/excalidraw/data/encode";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import { convertToExcalidrawElements } from "@excalidraw/element";
 import { exportToBlob, MIME_TYPES } from "@excalidraw/utils/export";
 
 import "./SketchFlowWorkspace.scss";
@@ -39,6 +40,186 @@ const DEFAULT_COLLECTION = "Personal";
 const SHARE_PARAM = "sf_scene";
 const READONLY_PARAM = "sf_readonly";
 const PRESENTATION_PARAM = "sf_present";
+
+const WORKSPACE_BACKUP_VERSION = 1;
+
+type SketchFlowTemplate = {
+  id: string;
+  name: string;
+  collection: string;
+  description: string;
+  elements: any[];
+};
+
+type VoteState = {
+  active: boolean;
+  revealed: boolean;
+  limit: number;
+  votes: Record<string, number>;
+};
+
+const TEMPLATE_STROKE = "#1e1e1e";
+const TEMPLATE_FILL = "#f1f3f5";
+
+const createTemplateText = (
+  text: string,
+  x: number,
+  y: number,
+  fontSize = 24,
+) => ({
+  type: "text",
+  x,
+  y,
+  text,
+  fontSize,
+  strokeColor: "#1d1458",
+});
+
+const templates: SketchFlowTemplate[] = [
+  {
+    id: "brainstorm",
+    name: "Brainstorm Board",
+    collection: "Templates",
+    description: "Idea zones, voting lane, and decision area.",
+    elements: [
+      { type: "frame", id: "brainstorm-frame", x: -80, y: -80, width: 1180, height: 720, name: "Brainstorm", children: [] },
+      createTemplateText("Brainstorm", 0, 0, 36),
+      ...["Ideas", "Questions", "Risks", "Decisions"].flatMap((title, index) => {
+        const x = 0 + index * 260;
+        return [
+          {
+            type: "rectangle",
+            id: `brainstorm-box-${index}`,
+            x,
+            y: 90,
+            width: 220,
+            height: 420,
+            backgroundColor: ["#fff3bf", "#d0ebff", "#ffd8a8", "#d3f9d8"][index],
+            fillStyle: "solid",
+            strokeColor: TEMPLATE_STROKE,
+          },
+          createTemplateText(title, x + 24, 118, 22),
+        ];
+      }),
+      createTemplateText("Vote on the strongest ideas, then move winners to Decisions.", 0, 570, 20),
+    ],
+  },
+  {
+    id: "kanban",
+    name: "Kanban Board",
+    collection: "Templates",
+    description: "To do, doing, review, and done workflow.",
+    elements: [
+      { type: "frame", id: "kanban-frame", x: -80, y: -80, width: 1180, height: 720, name: "Kanban", children: [] },
+      createTemplateText("Kanban", 0, 0, 36),
+      ...["To do", "Doing", "Review", "Done"].flatMap((title, index) => {
+        const x = 0 + index * 260;
+        return [
+          {
+            type: "rectangle",
+            id: `kanban-col-${index}`,
+            x,
+            y: 90,
+            width: 220,
+            height: 470,
+            backgroundColor: TEMPLATE_FILL,
+            fillStyle: "solid",
+            strokeColor: TEMPLATE_STROKE,
+          },
+          createTemplateText(title, x + 24, 118, 22),
+          {
+            type: "rectangle",
+            x: x + 24,
+            y: 175,
+            width: 172,
+            height: 74,
+            backgroundColor: "#fff3bf",
+            fillStyle: "solid",
+            strokeColor: "#e67700",
+            label: { text: "Task" },
+          },
+        ];
+      }),
+    ],
+  },
+  {
+    id: "retrospective",
+    name: "Retrospective",
+    collection: "Templates",
+    description: "What worked, what was hard, and actions.",
+    elements: [
+      { type: "frame", id: "retro-frame", x: -80, y: -80, width: 1020, height: 690, name: "Retro", children: [] },
+      createTemplateText("Retrospective", 0, 0, 36),
+      ...["Went well", "Could improve", "Action items"].flatMap((title, index) => {
+        const x = 0 + index * 300;
+        return [
+          {
+            type: "rectangle",
+            id: `retro-box-${index}`,
+            x,
+            y: 100,
+            width: 260,
+            height: 420,
+            backgroundColor: ["#d3f9d8", "#ffe3e3", "#d0ebff"][index],
+            fillStyle: "solid",
+            strokeColor: TEMPLATE_STROKE,
+          },
+          createTemplateText(title, x + 24, 130, 23),
+        ];
+      }),
+    ],
+  },
+  {
+    id: "lesson",
+    name: "Lesson Plan",
+    collection: "Templates",
+    description: "Objective, notes, activity, and homework.",
+    elements: [
+      { type: "frame", id: "lesson-frame", x: -80, y: -80, width: 1080, height: 720, name: "Lesson Plan", children: [] },
+      createTemplateText("Lesson Plan", 0, 0, 36),
+      { type: "rectangle", x: 0, y: 90, width: 920, height: 90, backgroundColor: "#d0ebff", fillStyle: "solid", label: { text: "Learning objective" } },
+      { type: "rectangle", x: 0, y: 220, width: 440, height: 300, backgroundColor: "#fff3bf", fillStyle: "solid", label: { text: "Teacher notes" } },
+      { type: "rectangle", x: 480, y: 220, width: 440, height: 300, backgroundColor: "#d3f9d8", fillStyle: "solid", label: { text: "Student activity" } },
+      { type: "rectangle", x: 0, y: 560, width: 920, height: 90, backgroundColor: "#ffe3e3", fillStyle: "solid", label: { text: "Homework / follow up" } },
+    ],
+  },
+  {
+    id: "wireframe",
+    name: "Landing Wireframe",
+    collection: "Templates",
+    description: "Hero, feature cards, and CTA layout.",
+    elements: [
+      { type: "frame", id: "wireframe-frame", x: -80, y: -80, width: 1060, height: 780, name: "Wireframe", children: [] },
+      createTemplateText("Landing Page Wireframe", 0, 0, 34),
+      { type: "rectangle", x: 0, y: 80, width: 900, height: 90, backgroundColor: "#f8f9fa", fillStyle: "solid", label: { text: "Navigation" } },
+      { type: "rectangle", x: 0, y: 210, width: 900, height: 190, backgroundColor: "#e7f5ff", fillStyle: "solid", label: { text: "Hero headline + CTA" } },
+      ...[0, 1, 2].map((index) => ({
+        type: "rectangle",
+        x: index * 310,
+        y: 440,
+        width: 280,
+        height: 160,
+        backgroundColor: "#f1f3f5",
+        fillStyle: "solid",
+        label: { text: `Feature ${index + 1}` },
+      })),
+    ],
+  },
+  {
+    id: "meeting",
+    name: "Meeting Agenda",
+    collection: "Templates",
+    description: "Agenda, notes, decisions, and owners.",
+    elements: [
+      { type: "frame", id: "meeting-frame", x: -80, y: -80, width: 1080, height: 700, name: "Meeting", children: [] },
+      createTemplateText("Meeting Agenda", 0, 0, 36),
+      { type: "rectangle", x: 0, y: 90, width: 300, height: 450, backgroundColor: "#fff3bf", fillStyle: "solid", label: { text: "Agenda" } },
+      { type: "rectangle", x: 340, y: 90, width: 300, height: 450, backgroundColor: "#f8f9fa", fillStyle: "solid", label: { text: "Notes" } },
+      { type: "rectangle", x: 680, y: 90, width: 300, height: 210, backgroundColor: "#d3f9d8", fillStyle: "solid", label: { text: "Decisions" } },
+      { type: "rectangle", x: 680, y: 330, width: 300, height: 210, backgroundColor: "#d0ebff", fillStyle: "solid", label: { text: "Owners" } },
+    ],
+  },
+];
 
 const openDatabase = () =>
   new Promise<IDBDatabase>((resolve, reject) => {
@@ -160,9 +341,19 @@ export const SketchFlowWorkspace = ({
   const [searchText, setSearchText] = useState("");
   const [status, setStatus] = useState("Workspace ready");
   const [toastMessage, setToastMessage] = useState("");
+  const [timerSeconds, setTimerSeconds] = useState(300);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [voteState, setVoteState] = useState<VoteState>({
+    active: false,
+    revealed: false,
+    limit: 3,
+    votes: {},
+  });
+  const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const autosaveTimerRef = useRef<number | null>(null);
   const loadedSharedSceneRef = useRef(false);
   const toastTimerRef = useRef<number | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const isReadonlyLink = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get(READONLY_PARAM) === "1";
@@ -340,6 +531,26 @@ export const SketchFlowWorkspace = ({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!timerRunning) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setTimerSeconds((seconds) => {
+        if (seconds <= 1) {
+          window.clearInterval(interval);
+          setTimerRunning(false);
+          notify("Timer finished");
+          return 0;
+        }
+        return seconds - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [notify, timerRunning]);
 
   const openScene = async (id: string) => {
     const scene = await getScene(id);
@@ -554,6 +765,170 @@ export const SketchFlowWorkspace = ({
     }
   };
 
+  const applyTemplate = async (template: SketchFlowTemplate) => {
+    const elements = convertToExcalidrawElements(template.elements, {
+      regenerateIds: true,
+    });
+
+    excalidrawAPI.resetScene();
+    excalidrawAPI.updateScene({
+      elements,
+      appState: {
+        name: template.name,
+        viewBackgroundColor: "#ffffff",
+        openDialog: null,
+        isLoading: false,
+      } as any,
+    });
+    excalidrawAPI.history.clear();
+    setActiveSceneId(null);
+    localStorage.removeItem(ACTIVE_SCENE_KEY);
+    setStatus(`Loaded ${template.name}`);
+    notify(`${template.name} template loaded`);
+  };
+
+  const exportWorkspaceBackup = async () => {
+    const backup = {
+      version: WORKSPACE_BACKUP_VERSION,
+      exportedAt: new Date().toISOString(),
+      app: "SketchFlow",
+      scenes: await listScenes(),
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `sketchflow-workspace-${new Date()
+      .toISOString()
+      .slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    notify("Workspace backup downloaded");
+  };
+
+  const importWorkspaceBackup = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    try {
+      const backup = JSON.parse(await file.text());
+      if (!Array.isArray(backup.scenes)) {
+        throw new Error("Invalid SketchFlow backup");
+      }
+
+      for (const scene of backup.scenes as SketchFlowScene[]) {
+        await putScene({
+          ...scene,
+          id: scene.id || createId(),
+          createdAt: scene.createdAt || Date.now(),
+          updatedAt: Date.now(),
+          collection: scene.collection || DEFAULT_COLLECTION,
+          comments: scene.comments || [],
+        });
+      }
+
+      await refreshScenes();
+      notify(`Imported ${backup.scenes.length} scenes`);
+    } catch (error) {
+      console.error(error);
+      notify("Backup import failed");
+    }
+  };
+
+  const setTimerMinutes = (minutes: number) => {
+    setTimerRunning(false);
+    setTimerSeconds(minutes * 60);
+  };
+
+  const resetVoting = () => {
+    setVoteState({
+      active: false,
+      revealed: false,
+      limit: voteState.limit,
+      votes: {},
+    });
+    notify("Voting reset");
+  };
+
+  const startVoting = () => {
+    setVoteState({
+      active: true,
+      revealed: false,
+      limit: voteState.limit,
+      votes: {},
+    });
+    notify("Voting started");
+  };
+
+  const revealVoting = () => {
+    setVoteState((state) => ({
+      ...state,
+      active: false,
+      revealed: true,
+    }));
+    notify("Voting revealed");
+  };
+
+  const addVote = (sceneId: string) => {
+    setVoteState((state) => {
+      const usedVotes = Object.values(state.votes).reduce(
+        (total, count) => total + count,
+        0,
+      );
+      if (!state.active || usedVotes >= state.limit) {
+        notify(
+          state.active ? "Vote limit reached" : "Start voting before voting",
+        );
+        return state;
+      }
+
+      return {
+        ...state,
+        votes: {
+          ...state.votes,
+          [sceneId]: (state.votes[sceneId] || 0) + 1,
+        },
+      };
+    });
+  };
+
+  const frames = useMemo(
+    () =>
+      excalidrawAPI
+        .getSceneElements()
+        .filter((element: any) => element.type === "frame" && !element.isDeleted),
+    [excalidrawAPI, scenes, activeSceneId, status],
+  );
+
+  const focusFrame = (index: number) => {
+    if (frames.length === 0) {
+      notify("No frames found for slides");
+      return;
+    }
+
+    const nextIndex = (index + frames.length) % frames.length;
+    const frame = frames[nextIndex] as any;
+    setCurrentFrameIndex(nextIndex);
+    excalidrawAPI.updateScene({
+      appState: {
+        viewModeEnabled: true,
+        zenModeEnabled: true,
+        frameToHighlight: frame,
+        scrollX: -frame.x + 120,
+        scrollY: -frame.y + 90,
+        zoom: { value: 1 },
+      } as any,
+    });
+    notify(`Slide ${nextIndex + 1} of ${frames.length}`);
+  };
+
   const collections = useMemo(
     () => ["All", ...Array.from(new Set(scenes.map((scene) => scene.collection)))],
     [scenes],
@@ -572,6 +947,13 @@ export const SketchFlowWorkspace = ({
 
     return matchesCollection && matchesSearch;
   });
+  const formattedTimer = `${Math.floor(timerSeconds / 60)
+    .toString()
+    .padStart(2, "0")}:${(timerSeconds % 60).toString().padStart(2, "0")}`;
+  const usedVotes = Object.values(voteState.votes).reduce(
+    (total, count) => total + count,
+    0,
+  );
 
   return (
     <>
@@ -600,6 +982,103 @@ export const SketchFlowWorkspace = ({
                 Close
               </button>
             </header>
+            {isReadonlyLink && (
+              <div className="SketchFlowWorkspace__banner">
+                Readonly link active. Editing tools are locked for viewers.
+              </div>
+            )}
+            <section className="SketchFlowWorkspace__section">
+              <div className="SketchFlowWorkspace__sectionTitle">
+                <h3>Templates</h3>
+                <p>Start from a ready board.</p>
+              </div>
+              <div className="SketchFlowWorkspace__templates">
+                {templates.map((template) => (
+                  <button
+                    className="SketchFlowWorkspace__template"
+                    key={template.id}
+                    type="button"
+                    onClick={() => applyTemplate(template)}
+                  >
+                    <strong>{template.name}</strong>
+                    <span>{template.description}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+            <section className="SketchFlowWorkspace__section">
+              <div className="SketchFlowWorkspace__sectionTitle">
+                <h3>Meeting Tools</h3>
+                <p>Timer, voting, and slide controls.</p>
+              </div>
+              <div className="SketchFlowWorkspace__meeting">
+                <div className="SketchFlowWorkspace__timer">
+                  <strong>{formattedTimer}</strong>
+                  <button type="button" onClick={() => setTimerRunning(true)}>
+                    Start
+                  </button>
+                  <button type="button" onClick={() => setTimerRunning(false)}>
+                    Pause
+                  </button>
+                  <button type="button" onClick={() => setTimerMinutes(5)}>
+                    5m
+                  </button>
+                  <button type="button" onClick={() => setTimerMinutes(15)}>
+                    15m
+                  </button>
+                  <button type="button" onClick={() => setTimerMinutes(30)}>
+                    30m
+                  </button>
+                </div>
+                <div className="SketchFlowWorkspace__timer">
+                  <strong>
+                    Votes {usedVotes}/{voteState.limit}
+                  </strong>
+                  <button type="button" onClick={startVoting}>
+                    Start voting
+                  </button>
+                  <button type="button" onClick={revealVoting}>
+                    Reveal
+                  </button>
+                  <button type="button" onClick={resetVoting}>
+                    Reset
+                  </button>
+                  <select
+                    value={voteState.limit}
+                    onChange={(event) =>
+                      setVoteState((state) => ({
+                        ...state,
+                        limit: Number(event.target.value),
+                      }))
+                    }
+                  >
+                    {[1, 2, 3, 5, 10].map((limit) => (
+                      <option key={limit} value={limit}>
+                        {limit} votes
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="SketchFlowWorkspace__timer">
+                  <strong>{frames.length} slides</strong>
+                  <button type="button" onClick={() => focusFrame(0)}>
+                    First slide
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => focusFrame(currentFrameIndex - 1)}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => focusFrame(currentFrameIndex + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </section>
             <div className="SketchFlowWorkspace__toolbar">
               <button type="button" onClick={() => saveScene()}>
                 Save current scene
@@ -625,6 +1104,22 @@ export const SketchFlowWorkspace = ({
               <button type="button" onClick={printToPdf}>
                 Print / PDF
               </button>
+              <button type="button" onClick={exportWorkspaceBackup}>
+                Export backup
+              </button>
+              <button
+                type="button"
+                onClick={() => importInputRef.current?.click()}
+              >
+                Import backup
+              </button>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json"
+                hidden
+                onChange={importWorkspaceBackup}
+              />
             </div>
             <div className="SketchFlowWorkspace__filters">
               <input
@@ -675,6 +1170,12 @@ export const SketchFlowWorkspace = ({
                     </button>
                     <button type="button" onClick={() => addComment(scene)}>
                       Comment
+                    </button>
+                    <button type="button" onClick={() => addVote(scene.id)}>
+                      Vote
+                      {voteState.revealed && voteState.votes[scene.id]
+                        ? ` (${voteState.votes[scene.id]})`
+                        : ""}
                     </button>
                     <button
                       type="button"
